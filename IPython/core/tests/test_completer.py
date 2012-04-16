@@ -285,61 +285,7 @@ def test_func_kw_completions():
     ip = get_ipython()
     c = ip.Completer
     ip.ex('def myfunc(a=1,b=2): return a+b')
-    s, matches = c.complete(None, 'myfunc(1,b')
-    nt.assert_in('b=', matches)
-    # Simulate completing with cursor right after b (pos==10):
-    s, matches = c.complete(None,'myfunc(1,b)', 10)
-    nt.assert_in('b=', matches)
-    s, matches = c.complete(None,'myfunc(a="escaped\\")string",b')
-    nt.assert_in('b=', matches)
-
-
-def test_line_magics():
-    ip = get_ipython()
-    c = ip.Completer
-    s, matches = c.complete(None, 'lsmag')
-    nt.assert_in('%lsmagic', matches)
-    s, matches = c.complete(None, '%lsmag')
-    nt.assert_in('%lsmagic', matches)
-
-
-def test_cell_magics():
-    from IPython.core.magic import register_cell_magic
-
-    @register_cell_magic
-    def _foo_cellm(line, cell):
-        pass
-    
-    ip = get_ipython()
-    c = ip.Completer
-
-    s, matches = c.complete(None, '_foo_ce')
-    nt.assert_in('%%_foo_cellm', matches)
-    s, matches = c.complete(None, '%%_foo_ce')
-    nt.assert_in('%%_foo_cellm', matches)
-
-
-def test_line_cell_magics():
-    from IPython.core.magic import register_line_cell_magic
-
-    @register_line_cell_magic
-    def _bar_cellm(line, cell):
-        pass
-    
-    ip = get_ipython()
-    c = ip.Completer
-
-    # The policy here is trickier, see comments in completion code.  The
-    # returned values depend on whether the user passes %% or not explicitly,
-    # and this will show a difference if the same name is both a line and cell
-    # magic.
-    s, matches = c.complete(None, '_bar_ce')
-    nt.assert_in('%_bar_cellm', matches)
-    nt.assert_in('%%_bar_cellm', matches)
-    s, matches = c.complete(None, '%_bar_ce')
-    nt.assert_in('%_bar_cellm', matches)
-    nt.assert_in('%%_bar_cellm', matches)
-    s, matches = c.complete(None, '%%_bar_ce')
-    nt.assert_not_in('%_bar_cellm', matches)
-    nt.assert_in('%%_bar_cellm', matches)
-
+    s, matches = c.complete(None,'myfunc(1,b')
+    nt.assert_true('b=' in matches) 
+    s, matches = c.complete(None,'myfunc(1,b)',10)
+    nt.assert_true('b=' in matches)
