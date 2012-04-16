@@ -52,7 +52,7 @@ def test_protect_filename():
     # run the actual tests
     for s1, s2 in pairs:
         s1p = completer.protect_filename(s1)
-        nt.assert_equal(s1p, s2)
+        nt.assert_equals(s1p, s2)
 
 
 def check_line_split(splitter, test_specs):
@@ -119,8 +119,8 @@ class CompletionSplitterTestCase(unittest.TestCase):
         self.sp = completer.CompletionSplitter()
 
     def test_delim_setting(self):
-        self.sp.delims = ' '
-        nt.assert_equal(self.sp.delims, ' ')
+        self.sp.set_delims(' ')
+        nt.assert_equal(self.sp.get_delims(), ' ')
         nt.assert_equal(self.sp._delim_expr, '[\ ]')
 
     def test_spaces(self):
@@ -202,18 +202,13 @@ def test_local_file_completions():
 
 def test_greedy_completions():
     ip = get_ipython()
-    greedy_original = ip.Completer.greedy
-    try:
-        ip.Completer.greedy = False
-        ip.ex('a=range(5)')
-        _,c = ip.complete('.',line='a[0].')
-        nt.assert_false('a[0].real' in c,
-                        "Shouldn't have completed on a[0]: %s"%c)
-        ip.Completer.greedy = True
-        _,c = ip.complete('.',line='a[0].')
-        nt.assert_true('a[0].real' in c, "Should have completed on a[0]: %s"%c)
-    finally:
-        ip.Completer.greedy = greedy_original
+    ip.Completer.greedy = False
+    ip.ex('a=range(5)')
+    _,c = ip.complete('.',line='a[0].')
+    nt.assert_false('a[0].real' in c, "Shouldn't have completed on a[0]: %s"%c)
+    ip.Completer.greedy = True
+    _,c = ip.complete('.',line='a[0].')
+    nt.assert_true('a[0].real' in c, "Should have completed on a[0]: %s"%c)
 
 
 def test_omit__names():
@@ -287,5 +282,5 @@ def test_func_kw_completions():
     ip.ex('def myfunc(a=1,b=2): return a+b')
     s, matches = c.complete(None,'myfunc(1,b')
     nt.assert_true('b=' in matches) 
-    s, matches = c.complete(None,'myfunc(1,b)',10)#cursor is right after b
+    s, matches = c.complete(None,'myfunc(1,b)',10)
     nt.assert_true('b=' in matches)
