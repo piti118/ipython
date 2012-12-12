@@ -9,12 +9,21 @@
 // Kernel
 //============================================================================
 
+/**
+ * @module IPython
+ * @namespace IPython
+ * @submodule Kernel
+ */
+
 var IPython = (function (IPython) {
 
     var utils = IPython.utils;
 
     // Initialization and connection.
-
+    /**
+     * A Kernel Class to communicate with the Python kernel
+     * @Class Kernel
+     */
     var Kernel = function (base_url) {
         this.kernel_id = null;
         this.shell_channel = null;
@@ -50,6 +59,10 @@ var IPython = (function (IPython) {
         return msg;
     };
 
+    /**
+     * Start the Python kernel
+     * @method start
+     */
     Kernel.prototype.start = function (notebook_id) {
         var that = this;
         if (!this.running) {
@@ -62,9 +75,16 @@ var IPython = (function (IPython) {
         };
     };
 
-
+    /**
+     * Restart the python kernel.
+     *
+     * Emit a 'status_restarting.Kernel' event with
+     * the current object as parameter
+     *
+     * @method restart
+     */
     Kernel.prototype.restart = function () {
-        $([IPython.events]).trigger({type: 'status_restarting.Kernel', kernel: this});
+        $([IPython.events]).trigger('status_restarting.Kernel', {kernel: this});
         var that = this;
         if (this.running) {
             this.stop_channels();
@@ -86,6 +106,7 @@ var IPython = (function (IPython) {
         this.start_channels();
         this.shell_channel.onmessage = $.proxy(this._handle_shell_reply,this);
         this.iopub_channel.onmessage = $.proxy(this._handle_iopub_reply,this);
+        $([IPython.events]).trigger('status_started.Kernel', {kernel: this});
     };
 
 
@@ -121,6 +142,12 @@ var IPython = (function (IPython) {
 
     };
 
+    /**
+     * Start the `shell`and `iopub` channels.
+     * Will stop and restart them if they already exist.
+     *
+     * @method start_channels
+     */
     Kernel.prototype.start_channels = function () {
         var that = this;
         this.stop_channels();
@@ -161,7 +188,10 @@ var IPython = (function (IPython) {
         }, 1000);
     };
 
-
+    /**
+     * Start the `shell`and `iopub` channels.
+     * @method stop_channels
+     */
     Kernel.prototype.stop_channels = function () {
         if (this.shell_channel !== null) {
             this.shell_channel.onclose = function (evt) {};
@@ -177,17 +207,28 @@ var IPython = (function (IPython) {
 
     // Main public methods.
 
+    /**
+     * Get info on object asynchronoulsy
+     *
+     * @async
+     * @param objname {string}
+     * @param callback {dict}
+     * @method object_info_request
+     *
+     * @example
+     *
+     * When calling this method pass a callbacks structure of the form:
+     *
+     *     callbacks = {
+     *      'object_info_reply': object_info_reply_callback
+     *     }
+     *
+     * The `object_info_reply_callback` will be passed the content object of the
+     *
+     * `object_into_reply` message documented in
+     * [IPython dev documentation](http://ipython.org/ipython-doc/dev/development/messaging.html#object-information)
+     */
     Kernel.prototype.object_info_request = function (objname, callbacks) {
-        // When calling this method pass a callbacks structure of the form:
-        //
-        // callbacks = {
-        //  'object_info_reply': object_into_reply_callback
-        // }
-        //
-        // The object_info_reply_callback will be passed the content object of the
-        // object_into_reply message documented here:
-        //
-        // http://ipython.org/ipython-doc/dev/development/messaging.html#object-information
         if(typeof(objname)!=null && objname!=null)
         {
             var content = {
@@ -201,42 +242,61 @@ var IPython = (function (IPython) {
         return;
     }
 
+    /**
+     * Execute given code into kernel, and pass result to callback.
+     *
+     * @async
+     * @method execute
+     * @param {string} code
+     * @param callback {Object} With the following keys
+     *      @param callback.'execute_reply' {function}
+     *      @param callback.'output' {function}
+     *      @param callback.'clear_output' {function}
+     *      @param callback.'set_next_input' {function}
+     * @param {object} [options]
+     *      @param [options.silent=false] {Boolean}
+     *      @param [options.user_expressions=empty_dict] {Dict}
+     *      @param [options.user_variables=empty_list] {List od Strings}
+     *      @param [options.allow_stdin=false] {Boolean} true|false
+     *
+     * @example
+     *
+     * The options object should contain the options for the execute call. Its default
+     * values are:
+     *
+     *      options = {
+     *        silent : true,
+     *        user_variables : [],
+     *        user_expressions : {},
+     *        allow_stdin : false
+     *      }
+     *
+     * When calling this method pass a callbacks structure of the form:
+     *
+     *      callbacks = {
+     *       'execute_reply': execute_reply_callback,
+     *       'output': output_callback,
+     *       'clear_output': clear_output_callback,
+     *       'set_next_input': set_next_input_callback
+     *      }
+     *
+     * The `execute_reply_callback` will be passed the content and metadata
+     * objects of the `execute_reply` message documented
+     * [here](http://ipython.org/ipython-doc/dev/development/messaging.html#execute)
+     *
+     * The `output_callback` will be passed `msg_type` ('stream','display_data','pyout','pyerr')
+     * of the output and the content and metadata objects of the PUB/SUB channel that contains the
+     * output:
+     *
+     * http://ipython.org/ipython-doc/dev/development/messaging.html#messages-on-the-pub-sub-socket
+     *
+     * The `clear_output_callback` will be passed a content object that contains
+     * stdout, stderr and other fields that are booleans, as well as the metadata object.
+     *
+     * The `set_next_input_callback` will be passed the text that should become the next
+     * input cell.
+     */
     Kernel.prototype.execute = function (code, callbacks, options) {
-        // The options object should contain the options for the execute call. Its default
-        // values are:
-        //
-        // options = {
-        //   silent : true,
-        //   user_variables : [],
-        //   user_expressions : {},
-        //   allow_stdin : false
-        // }
-        //
-        // When calling this method pass a callbacks structure of the form:
-        //
-        // callbacks = {
-        //  'execute_reply': execute_reply_callback,
-        //  'output': output_callback,
-        //  'clear_output': clear_output_callback,
-        //  'set_next_input': set_next_input_callback
-        // }
-        //
-        // The execute_reply_callback will be passed the content and metadata objects of the execute_reply
-        // message documented here:
-        //
-        // http://ipython.org/ipython-doc/dev/development/messaging.html#execute
-        //
-        // The output_callback will be passed msg_type ('stream','display_data','pyout','pyerr')
-        // of the output and the content and metadata objects of the PUB/SUB channel that contains the
-        // output:
-        //
-        // http://ipython.org/ipython-doc/dev/development/messaging.html#messages-on-the-pub-sub-socket
-        //
-        // The clear_output_callback will be passed a content object that contains
-        // stdout, stderr and other fields that are booleans, as well as the metadata object.
-        //
-        // The set_next_input_callback will be passed the text that should become the next
-        // input cell.
 
         var content = {
             code : code,
@@ -245,25 +305,33 @@ var IPython = (function (IPython) {
             user_expressions : {},
             allow_stdin : false
         };
-		$.extend(true, content, options)
+        $.extend(true, content, options)
+        $([IPython.events]).trigger('execution_request.Kernel', {kernel: this, content:content});
         var msg = this._get_msg("execute_request", content);
         this.shell_channel.send(JSON.stringify(msg));
         this.set_callbacks_for_msg(msg.header.msg_id, callbacks);
         return msg.header.msg_id;
     };
 
-
+    /**
+     * When calling this method pass a callbacks structure of the form:
+     *
+     *      callbacks = {
+     *       'complete_reply': complete_reply_callback
+     *      }
+     *
+     * The `complete_reply_callback` will be passed the content object of the
+     * `complete_reply` message documented
+     * [here](http://ipython.org/ipython-doc/dev/development/messaging.html#complete)
+     *
+     * @method complete
+     * @param line {integer}
+     * @param cursor_pos {integer}
+     * @param {dict} callbacks
+     *      @param callbacks.complete_reply {function} `complete_reply_callback`
+     *
+     */
     Kernel.prototype.complete = function (line, cursor_pos, callbacks) {
-        // When calling this method pass a callbacks structure of the form:
-        //
-        // callbacks = {
-        //  'complete_reply': complete_reply_callback
-        // }
-        //
-        // The complete_reply_callback will be passed the content object of the
-        // complete_reply message documented here:
-        //
-        // http://ipython.org/ipython-doc/dev/development/messaging.html#complete
         callbacks = callbacks || {};
         var content = {
             text : '',
@@ -279,7 +347,7 @@ var IPython = (function (IPython) {
 
     Kernel.prototype.interrupt = function () {
         if (this.running) {
-            $([IPython.events]).trigger({type: 'status_interrupting.Kernel', kernel: this});
+            $([IPython.events]).trigger('status_interrupting.Kernel', {kernel: this});
             $.post(this.kernel_url + "/interrupt");
         };
     };
@@ -312,6 +380,7 @@ var IPython = (function (IPython) {
 
     Kernel.prototype._handle_shell_reply = function (e) {
         reply = $.parseJSON(e.data);
+        $([IPython.events]).trigger('shell_reply.Kernel', {kernel: this, reply:reply});
         var header = reply.header;
         var content = reply.content;
         var metadata = reply.metadata;
@@ -367,12 +436,12 @@ var IPython = (function (IPython) {
             }
         } else if (msg_type === 'status') {
             if (content.execution_state === 'busy') {
-                $([IPython.events]).trigger({type: 'status_busy.Kernel', kernel: this});
+                $([IPython.events]).trigger('status_busy.Kernel', {kernel: this});
             } else if (content.execution_state === 'idle') {
-                $([IPython.events]).trigger({type: 'status_idle.Kernel', kernel: this});
+                $([IPython.events]).trigger('status_idle.Kernel', {kernel: this});
             } else if (content.execution_state === 'dead') {
                 this.stop_channels();
-                $([IPython.events]).trigger({type: 'status_dead.Kernel', kernel: this});
+                $([IPython.events]).trigger('status_dead.Kernel', {kernel: this});
             };
         } else if (msg_type === 'clear_output') {
             var cb = callbacks['clear_output'];

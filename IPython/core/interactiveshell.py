@@ -64,6 +64,7 @@ from IPython.utils import PyColorize
 from IPython.utils import io
 from IPython.utils import py3compat
 from IPython.utils import openpy
+from IPython.utils.decorators import undoc
 from IPython.utils.doctestreload import doctest_reload
 from IPython.utils.io import ask_yes_no
 from IPython.utils.ipstruct import Struct
@@ -90,6 +91,7 @@ dedent_re = re.compile(r'^\s+raise|^\s+return|^\s+pass')
 # Utilities
 #-----------------------------------------------------------------------------
 
+@undoc
 def softspace(file, newvalue):
     """Copied from code.py, to remove the dependency"""
 
@@ -105,9 +107,10 @@ def softspace(file, newvalue):
         pass
     return oldvalue
 
-
+@undoc
 def no_op(*a, **kw): pass
 
+@undoc
 class NoOpContext(object):
     def __enter__(self): pass
     def __exit__(self, type, value, traceback): pass
@@ -115,6 +118,7 @@ no_op_context = NoOpContext()
 
 class SpaceInInput(Exception): pass
 
+@undoc
 class Bunch: pass
 
 
@@ -192,6 +196,13 @@ class InteractiveShell(SingletonConfigurable):
     """An enhanced, interactive shell for Python."""
 
     _instance = None
+    
+    ast_transformers = List([], config=True, help=
+        """
+        A list of ast.NodeTransformer subclass instances, which will be applied
+        to user input before code is run.
+        """
+    )
 
     autocall = Enum((0,1,2), default_value=0, config=True, help=
         """
@@ -322,7 +333,7 @@ class InteractiveShell(SingletonConfigurable):
             'prompt_out' : 'out_template',
             'prompts_pad_left' : 'justify',
         }
-        warn("InteractiveShell.{name} is deprecated, use PromptManager.{newname}\n".format(
+        warn("InteractiveShell.{name} is deprecated, use PromptManager.{newname}".format(
                 name=name, newname=table[name])
         )
         # protect against weird cases where self.config may not exist:
@@ -629,7 +640,7 @@ class InteractiveShell(SingletonConfigurable):
         # override sys.stdout and sys.stderr themselves, you need to do that
         # *before* instantiating this class, because io holds onto
         # references to the underlying streams.
-        if sys.platform == 'win32' and self.has_readline:
+        if (sys.platform == 'win32' or sys.platform == 'cli') and self.has_readline:
             io.stdout = io.stderr = io.IOStream(self.readline._outputfile)
         else:
             io.stdout = io.IOStream(sys.stdout)
@@ -705,7 +716,7 @@ class InteractiveShell(SingletonConfigurable):
             return
         
         warn("Attempting to work in a virtualenv. If you encounter problems, please "
-             "install IPython inside the virtualenv.\n")
+             "install IPython inside the virtualenv.")
         if sys.platform == "win32":
             virtual_env = os.path.join(os.environ['VIRTUAL_ENV'], 'Lib', 'site-packages') 
         else:
@@ -2607,6 +2618,8 @@ class InteractiveShell(SingletonConfigurable):
                             self.execution_count += 1
                         return None
                     
+                    code_ast = self.transform_ast(code_ast)
+                    
                     interactivity = "none" if silent else self.ast_node_interactivity
                     self.run_ast_nodes(code_ast.body, cell_name,
                                        interactivity=interactivity)
@@ -2639,6 +2652,31 @@ class InteractiveShell(SingletonConfigurable):
             self.history_manager.store_output(self.execution_count)
             # Each cell is a *single* input, regardless of how many lines it has
             self.execution_count += 1
+    
+    def transform_ast(self, node):
+        """Apply the AST transformations from self.ast_transformers
+        
+        Parameters
+        ----------
+        node : ast.Node
+          The root node to be transformed. Typically called with the ast.Module
+          produced by parsing user input.
+        
+        Returns
+        -------
+        An ast.Node corresponding to the node it was called with. Note that it
+        may also modify the passed object, so don't rely on references to the
+        original AST.
+        """
+        for transformer in self.ast_transformers:
+            try:
+                node = transformer.visit(node)
+            except Exception:
+                warn("AST transformer %r threw an error. It will be unregistered." % transformer)
+                self.ast_transformers.remove(transformer)
+        
+        return ast.fix_missing_locations(node)
+                
 
     def run_ast_nodes(self, nodelist, cell_name, interactivity='last_expr'):
         """Run a sequence of AST nodes. The execution mode depends on the
